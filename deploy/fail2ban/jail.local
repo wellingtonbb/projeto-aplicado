@@ -1,0 +1,35 @@
+# ==============================================================================
+# PROJETO WEB SEGURO — SECURE BY DESIGN / SECURE BY DEFAULT
+# Configuração Fail2Ban no HOST (Ubuntu 24.04 LTS)
+# Arquivo: /etc/fail2ban/jail.local
+# Requisito 41: SSH com maxretry = 4 e bantime = 24h
+# ==============================================================================
+
+[DEFAULT]
+# Tempo de banimento: 24 horas (86400 segundos)
+bantime = 24h
+
+# Janela de tempo de monitoramento: 10 minutos
+findtime = 10m
+
+# Número máximo de falhas antes do banimento: 4 tentativas
+maxretry = 4
+
+# Backend de detecção no Ubuntu 24.04 (systemd journal)
+backend = systemd
+
+# Ação de banimento utilizando iptables/nftables padrão
+banaction = ufw
+banaction_allports = ufw
+
+# ------------------------------------------------------------------------------
+# Proteção do Serviço SSH (sshd)
+# ------------------------------------------------------------------------------
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = %(sshd_log)s
+maxretry = 4
+findtime = 10m
+bantime = 24h

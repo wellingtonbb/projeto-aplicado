@@ -1,0 +1,42 @@
+# Environment and secrets (CRITICAL: Never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Composer & Node
+/vendor/
+/node_modules/
+
+# Logs, Cache and Framework state
+*.log
+/storage/logs/*.log
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+.phpunit.result.cache
+/.phpunit.cache
+
+# Keys, Certificates and Secrets
+*.pem
+*.key
+*.crt
+/storage/*.key
+/auth.json
+
+# IDE and Editors
+.DS_Store
+Thumbs.db
+/.idea/
+/.vscode/
+/.fleet/
+/.nova/
+/.zed/
+.phpactor.json
+
+# Build outputs
+/public/build
+/public/hot
+/public/storage

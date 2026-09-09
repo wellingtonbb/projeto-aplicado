@@ -1,0 +1,36 @@
+# Version Control
+.git
+.gitignore
+.github
+
+# Secrets and Local Environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Vendor and Node Modules (Installed inside container build)
+vendor/
+node_modules/
+
+# Logs and runtime state
+storage/logs/*
+!storage/logs/.gitignore
+storage/framework/sessions/*
+!storage/framework/sessions/.gitignore
+storage/framework/views/*
+!storage/framework/views/.gitignore
+storage/framework/cache/*
+!storage/framework/cache/.gitignore
+
+# Testing and IDE
+tests/
+.phpunit.result.cache
+.phpunit.cache
+.idea/
+.vscode/
+.fleet/
+.nova/
+.zed/

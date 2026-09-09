@@ -1,0 +1,134 @@
+name: CI/CD Pipeline - Test, Security Audit & Deploy
+
+# Disparo automático a cada push na branch principal (Requisito 37)
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # ETAPA 1: TESTES AUTOMATIZADOS (Requisito 38)
+  # Executa PHPUnit com Laravel 12 e PHP 8.4. Se falhar, o deploy é abortado.
+  # ----------------------------------------------------------------------------
+  test:
+    name: "Automated Tests (PHP 8.4 / Laravel 12)"
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, bcmath, zip, curl
+          coverage: none
+
+      - name: Obter Diretório de Cache do Composer
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache de Dependências do Composer
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Instalação de Dependências
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Copiar Configuração de Ambiente para Testes
+        run: cp .env.example .env
+
+      - name: Gerar Chave da Aplicação (APP_KEY)
+        run: php artisan key:generate
+
+      - name: Executar Suíte de Testes de Segurança (Artisan Test)
+        run: php artisan test --colors=always
+
+  # ----------------------------------------------------------------------------
+  # ETAPA 2: AUDITORIA DE SEGURANÇA (DevSecOps)
+  # Verifica CVEs em dependências e certifica que nenhum segredo foi commitado.
+  # ----------------------------------------------------------------------------
+  security-audit:
+    name: "DevSecOps Security Audit"
+    needs: test
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+
+      - name: Composer Security Audit (CVEs)
+        run: composer audit --no-interaction
+
+      - name: Verificação de Ausência de Segredos no Git (Secret Scanning)
+        run: |
+          echo "===> Verificando se há arquivos proibidos rastreados no Git..."
+          LEAKED_FILES=$(git ls-files | grep -E '(\.env$|\.env\.|\.pem$|\.key$|\.crt$)' || true)
+          if [ -n "$LEAKED_FILES" ]; then
+            echo "ERRO CRÍTICO: Arquivos sensíveis detectados no versionamento:"
+            echo "$LEAKED_FILES"
+            exit 1
+          fi
+          echo "[OK] Nenhum segredo ou chave privada rastreada no repositório."
+
+  # ----------------------------------------------------------------------------
+  # ETAPA 3: DEPLOY AUTOMATIZADO VIA SSH (Requisito 39)
+  # Disparado apenas na branch main após aprovação nos testes e na auditoria.
+  # Conecta no Ubuntu Server 24.04, atualiza o código e reinicia o Docker.
+  # ----------------------------------------------------------------------------
+  deploy:
+    name: "SSH Deploy to Cloud Server"
+    needs: [test, security-audit]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Executar Deploy no Servidor Host via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "===> [DEPLOY] Conectado com sucesso ao Host Ubuntu 24.04!"
+            
+            # Navega até o diretório da aplicação
+            cd /opt/secure-web
+            
+            echo "===> [DEPLOY] Atualizando código-fonte via Git..."
+            git pull origin main
+            
+            echo "===> [DEPLOY] Construindo imagem Docker de produção..."
+            docker compose build
+            
+            echo "===> [DEPLOY] Reiniciando contêiner de aplicação isolado..."
+            docker compose up -d
+            
+            echo "===> [DEPLOY] Validando status do contêiner..."
+            docker compose ps
+            
+            echo "===> [DEPLOY] Testando integridade local do Health Check (127.0.0.1:8080/health)..."
+            sleep 3
+            HEALTH_OUTPUT=$(curl -s -f http://127.0.0.1:8080/health)
+            echo "Resposta do Health Check: $HEALTH_OUTPUT"
+            
+            echo "===> [DEPLOY] Deploy finalizado com sucesso absoluto!"

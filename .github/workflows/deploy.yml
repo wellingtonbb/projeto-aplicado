@@ -1,6 +1,6 @@
 name: CI/CD Pipeline - Test, Security Audit & Deploy
 
-# Disparo automático a cada push na branch principal (Requisito 37)
+# Disparo automático a cada push na branch principal
 on:
   push:
     branches:
@@ -14,15 +14,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ----------------------------------------------------------------------------
-  # ETAPA 1: TESTES AUTOMATIZADOS (Requisito 38)
-  # Executa PHPUnit com Laravel 12 e PHP 8.4. Se falhar, o deploy é abortado.
-  # ----------------------------------------------------------------------------
+
+  # ============================================================================
+  # ETAPA 1: TESTES AUTOMATIZADOS
+  # Laravel 12 + PHP 8.4
+  # ============================================================================
+
   test:
     name: "Automated Tests (PHP 8.4 / Laravel 12)"
     runs-on: ubuntu-24.04
 
     steps:
+
       - name: Checkout do Código
         uses: actions/checkout@v4
 
@@ -42,7 +45,8 @@ jobs:
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
+          restore-keys: |
+            ${{ runner.os }}-composer-
 
       - name: Instalação de Dependências
         run: composer install --prefer-dist --no-interaction --no-progress
@@ -50,22 +54,24 @@ jobs:
       - name: Copiar Configuração de Ambiente para Testes
         run: cp .env.example .env
 
-      - name: Gerar Chave da Aplicação (APP_KEY)
+      - name: Gerar Chave da Aplicação
         run: php artisan key:generate
 
-      - name: Executar Suíte de Testes de Segurança (Artisan Test)
+      - name: Executar Suíte de Testes
         run: php artisan test --colors=always
 
-  # ----------------------------------------------------------------------------
-  # ETAPA 2: AUDITORIA DE SEGURANÇA (DevSecOps)
-  # Verifica CVEs em dependências e certifica que nenhum segredo foi commitado.
-  # ----------------------------------------------------------------------------
+
+  # ============================================================================
+  # ETAPA 2: AUDITORIA DE SEGURANÇA - DEVSECOPS
+  # ============================================================================
+
   security-audit:
     name: "DevSecOps Security Audit"
     needs: test
     runs-on: ubuntu-24.04
 
     steps:
+
       - name: Checkout do Código
         uses: actions/checkout@v4
 
@@ -74,33 +80,47 @@ jobs:
         with:
           php-version: '8.4'
 
+      - name: Instalação de Dependências
+        run: composer install --prefer-dist --no-interaction --no-progress
+
       - name: Composer Security Audit (CVEs)
         run: composer audit --no-interaction
 
-      - name: Verificação de Ausência de Segredos no Git (Secret Scanning)
+      - name: Verificação de Ausência de Segredos no Git
         run: |
-          echo "===> Verificando se há arquivos proibidos rastreados no Git..."
-          LEAKED_FILES=$(git ls-files | grep -E '(\.env$|\.env\.|\.pem$|\.key$|\.crt$)' || true)
+          echo "===> Verificando arquivos sensíveis rastreados no Git..."
+
+          LEAKED_FILES=$(git ls-files | grep -E '(^|/)(\.env$|\.env\.|.*\.pem$|.*\.key$|.*\.crt$)' || true)
+
           if [ -n "$LEAKED_FILES" ]; then
             echo "ERRO CRÍTICO: Arquivos sensíveis detectados no versionamento:"
             echo "$LEAKED_FILES"
             exit 1
           fi
-          echo "[OK] Nenhum segredo ou chave privada rastreada no repositório."
 
-  # ----------------------------------------------------------------------------
-  # ETAPA 3: DEPLOY AUTOMATIZADO VIA SSH (Requisito 39)
-  # Disparado apenas na branch main após aprovação nos testes e na auditoria.
-  # Conecta no Ubuntu Server 24.04, atualiza o código e reinicia o Docker.
-  # ----------------------------------------------------------------------------
+          echo "[OK] Nenhum arquivo sensível rastreado no repositório."
+
+
+  # ============================================================================
+  # ETAPA 3: DEPLOY AUTOMATIZADO VIA SSH
+  # Servidor de produção: Debian 13
+  # ============================================================================
+
   deploy:
-    name: "SSH Deploy to Cloud Server"
-    needs: [test, security-audit]
+    name: "SSH Deploy to Debian 13"
+    needs:
+      - test
+      - security-audit
+
+    # Deploy somente após push na main.
+    # Pull Request nunca executa deploy.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Executar Deploy no Servidor Host via SSH
+
+      - name: Executar Deploy no Servidor Debian 13
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -108,27 +128,49 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script_stop: true
+
           script: |
-            echo "===> [DEPLOY] Conectado com sucesso ao Host Ubuntu 24.04!"
-            
-            # Navega até o diretório da aplicação
+
+            echo "=============================================="
+            echo "        DEPLOY - SERVIDOR DEBIAN 13"
+            echo "=============================================="
+
+            echo "===> [DEPLOY] Conectado ao servidor."
+
+            echo "===> [DEPLOY] Verificando sistema operacional..."
+            cat /etc/os-release
+
+            echo "===> [DEPLOY] Verificando Docker..."
+            docker --version
+
+            echo "===> [DEPLOY] Verificando Docker Compose..."
+            docker compose version
+
+            echo "===> [DEPLOY] Acessando diretório da aplicação..."
             cd /opt/secure-web
-            
-            echo "===> [DEPLOY] Atualizando código-fonte via Git..."
-            git pull origin main
-            
-            echo "===> [DEPLOY] Construindo imagem Docker de produção..."
-            docker compose build
-            
-            echo "===> [DEPLOY] Reiniciando contêiner de aplicação isolado..."
-            docker compose up -d
-            
-            echo "===> [DEPLOY] Validando status do contêiner..."
+
+            echo "===> [DEPLOY] Atualizando código-fonte..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "===> [DEPLOY] Construindo imagem Docker..."
+            docker compose build --pull
+
+            echo "===> [DEPLOY] Subindo aplicação..."
+            docker compose up -d --remove-orphans
+
+            echo "===> [DEPLOY] Aguardando inicialização..."
+            sleep 5
+
+            echo "===> [DEPLOY] Status dos containers..."
             docker compose ps
-            
-            echo "===> [DEPLOY] Testando integridade local do Health Check (127.0.0.1:8080/health)..."
-            sleep 3
+
+            echo "===> [DEPLOY] Testando Health Check..."
             HEALTH_OUTPUT=$(curl -s -f http://127.0.0.1:8080/health)
-            echo "Resposta do Health Check: $HEALTH_OUTPUT"
-            
-            echo "===> [DEPLOY] Deploy finalizado com sucesso absoluto!"
+
+            echo "Resposta do Health Check:"
+            echo "$HEALTH_OUTPUT"
+
+            echo "=============================================="
+            echo "       DEPLOY FINALIZADO COM SUCESSO"
+            echo "=============================================="

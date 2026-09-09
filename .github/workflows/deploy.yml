@@ -1,33 +1,65 @@
 name: CI/CD Pipeline - Test, Security Audit & Deploy
 
-# Disparo automático a cada push na branch principal
+# ============================================================================
+# DISPAROS DO PIPELINE
+# ============================================================================
+# Executa automaticamente:
+# - Push na branch main
+# - Pull Request direcionado para a branch main
+# ============================================================================
+
 on:
   push:
     branches:
       - main
+
   pull_request:
     branches:
       - main
+
+
+# ============================================================================
+# CONTROLE DE CONCORRÊNCIA
+# ============================================================================
+# Evita executar simultaneamente pipelines conflitantes da mesma referência.
+# ============================================================================
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+
 jobs:
 
-  # ============================================================================
+  # ==========================================================================
   # ETAPA 1: TESTES AUTOMATIZADOS
-  # Laravel 12 + PHP 8.4
-  # ============================================================================
+  # ==========================================================================
+  # Laravel 12
+  # PHP 8.4
+  # PHPUnit / Artisan Test
+  #
+  # Se os testes falharem, o pipeline será interrompido.
+  # ==========================================================================
 
   test:
+
     name: "Automated Tests (PHP 8.4 / Laravel 12)"
+
     runs-on: ubuntu-24.04
 
     steps:
 
+      # ----------------------------------------------------------------------
+      # Checkout
+      # ----------------------------------------------------------------------
+
       - name: Checkout do Código
         uses: actions/checkout@v4
+
+
+      # ----------------------------------------------------------------------
+      # PHP 8.4
+      # ----------------------------------------------------------------------
 
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -36,9 +68,15 @@ jobs:
           extensions: mbstring, xml, ctype, iconv, intl, pdo, bcmath, zip, curl
           coverage: none
 
+
+      # ----------------------------------------------------------------------
+      # Cache do Composer
+      # ----------------------------------------------------------------------
+
       - name: Obter Diretório de Cache do Composer
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
 
       - name: Cache de Dependências do Composer
         uses: actions/cache@v4
@@ -48,129 +86,334 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-composer-
 
+
+      # ----------------------------------------------------------------------
+      # Instalação das dependências
+      # ----------------------------------------------------------------------
+
       - name: Instalação de Dependências
         run: composer install --prefer-dist --no-interaction --no-progress
+
+
+      # ----------------------------------------------------------------------
+      # Ambiente Laravel para testes
+      # ----------------------------------------------------------------------
 
       - name: Copiar Configuração de Ambiente para Testes
         run: cp .env.example .env
 
+
       - name: Gerar Chave da Aplicação
         run: php artisan key:generate
+
+
+      # ----------------------------------------------------------------------
+      # Testes
+      # ----------------------------------------------------------------------
 
       - name: Executar Suíte de Testes
         run: php artisan test --colors=always
 
 
-  # ============================================================================
+  # ==========================================================================
   # ETAPA 2: AUDITORIA DE SEGURANÇA - DEVSECOPS
-  # ============================================================================
+  # ==========================================================================
+  #
+  # Verificações:
+  #
+  # 1. Vulnerabilidades conhecidas (CVEs) nas dependências Composer
+  # 2. Arquivos sensíveis rastreados pelo Git
+  #
+  # Só executa depois dos testes passarem.
+  # ==========================================================================
 
   security-audit:
+
     name: "DevSecOps Security Audit"
+
     needs: test
+
     runs-on: ubuntu-24.04
 
     steps:
 
+      # ----------------------------------------------------------------------
+      # Checkout
+      # ----------------------------------------------------------------------
+
       - name: Checkout do Código
         uses: actions/checkout@v4
+
+
+      # ----------------------------------------------------------------------
+      # PHP 8.4
+      # ----------------------------------------------------------------------
 
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
 
+
+      # ----------------------------------------------------------------------
+      # Instalação das dependências
+      #
+      # Necessário porque cada Job do GitHub Actions possui ambiente próprio.
+      # ----------------------------------------------------------------------
+
       - name: Instalação de Dependências
         run: composer install --prefer-dist --no-interaction --no-progress
+
+
+      # ----------------------------------------------------------------------
+      # Auditoria de vulnerabilidades Composer
+      # ----------------------------------------------------------------------
 
       - name: Composer Security Audit (CVEs)
         run: composer audit --no-interaction
 
+
+      # ----------------------------------------------------------------------
+      # Secret Scanning
+      #
+      # .env.example NÃO é considerado segredo.
+      #
+      # São bloqueados:
+      # - .env
+      # - .env.local
+      # - .env.production
+      # - .env.staging
+      # - .env.development
+      # - .env.testing
+      # - arquivos .pem
+      # - arquivos .key
+      # - arquivos .crt
+      # ----------------------------------------------------------------------
+
       - name: Verificação de Ausência de Segredos no Git
         run: |
+
           echo "===> Verificando arquivos sensíveis rastreados no Git..."
 
-          LEAKED_FILES=$(git ls-files | grep -E '(^|/)(\.env$|\.env\.|.*\.pem$|.*\.key$|.*\.crt$)' || true)
+          LEAKED_FILES=$(git ls-files | grep -E '(^|/)(\.env$|\.env\.(local|production|staging|development|testing)$|.*\.pem$|.*\.key$|.*\.crt$)' || true)
+
 
           if [ -n "$LEAKED_FILES" ]; then
-            echo "ERRO CRÍTICO: Arquivos sensíveis detectados no versionamento:"
+
+            echo ""
+            echo "============================================================"
+            echo "ERRO CRÍTICO: Arquivos sensíveis detectados no versionamento"
+            echo "============================================================"
+            echo ""
+
             echo "$LEAKED_FILES"
+
+            echo ""
+            echo "Remova esses arquivos do Git antes de continuar."
+            echo ""
+
             exit 1
+
           fi
 
+
+          echo ""
           echo "[OK] Nenhum arquivo sensível rastreado no repositório."
+          echo ""
 
 
-  # ============================================================================
+  # ==========================================================================
   # ETAPA 3: DEPLOY AUTOMATIZADO VIA SSH
-  # Servidor de produção: Debian 13
-  # ============================================================================
+  # ==========================================================================
+  #
+  # Servidor:
+  # Debian 13
+  #
+  # Aplicação:
+  # /opt/secure-web
+  #
+  # Docker / Docker Compose
+  #
+  # O deploy somente acontece:
+  #
+  # - na branch main
+  # - através de push
+  # - após TESTES passarem
+  # - após SECURITY AUDIT passar
+  # ==========================================================================
 
   deploy:
+
     name: "SSH Deploy to Debian 13"
+
     needs:
       - test
       - security-audit
 
-    # Deploy somente após push na main.
-    # Pull Request nunca executa deploy.
+
+    # ------------------------------------------------------------------------
+    # IMPORTANTE:
+    # Deploy NÃO acontece em Pull Request.
+    # Só acontece quando houver PUSH diretamente na main.
+    # ------------------------------------------------------------------------
+
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
 
     runs-on: ubuntu-24.04
 
+
     steps:
+
+      # ----------------------------------------------------------------------
+      # Deploy via SSH
+      # ----------------------------------------------------------------------
 
       - name: Executar Deploy no Servidor Debian 13
         uses: appleboy/ssh-action@v1.2.0
+
         with:
+
           host: ${{ secrets.SERVER_HOST }}
+
           username: ${{ secrets.SERVER_USER }}
+
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+
           port: ${{ secrets.SERVER_PORT || 22 }}
+
           script_stop: true
+
 
           script: |
 
-            echo "=============================================="
-            echo "        DEPLOY - SERVIDOR DEBIAN 13"
-            echo "=============================================="
+            echo ""
+            echo "============================================================"
+            echo "             DEPLOY - SERVIDOR DEBIAN 13"
+            echo "============================================================"
+            echo ""
+
+
+            # ================================================================
+            # VERIFICAÇÃO DO SISTEMA
+            # ================================================================
 
             echo "===> [DEPLOY] Conectado ao servidor."
 
-            echo "===> [DEPLOY] Verificando sistema operacional..."
+            echo ""
+            echo "===> [DEPLOY] Sistema operacional:"
             cat /etc/os-release
 
+
+            # ================================================================
+            # VERIFICAÇÃO DO DOCKER
+            # ================================================================
+
+            echo ""
             echo "===> [DEPLOY] Verificando Docker..."
+
             docker --version
 
+
+            echo ""
             echo "===> [DEPLOY] Verificando Docker Compose..."
+
             docker compose version
 
+
+            # ================================================================
+            # DIRETÓRIO DA APLICAÇÃO
+            # ================================================================
+
+            echo ""
             echo "===> [DEPLOY] Acessando diretório da aplicação..."
+
             cd /opt/secure-web
 
+
+            # ================================================================
+            # ATUALIZAÇÃO DO CÓDIGO
+            # ================================================================
+
+            echo ""
             echo "===> [DEPLOY] Atualizando código-fonte..."
+
             git fetch origin main
+
             git reset --hard origin/main
 
+
+            # ================================================================
+            # BUILD DA APLICAÇÃO
+            # ================================================================
+
+            echo ""
             echo "===> [DEPLOY] Construindo imagem Docker..."
+
             docker compose build --pull
 
-            echo "===> [DEPLOY] Subindo aplicação..."
+
+            # ================================================================
+            # INICIALIZAÇÃO / ATUALIZAÇÃO DOS CONTAINERS
+            # ================================================================
+
+            echo ""
+            echo "===> [DEPLOY] Iniciando aplicação..."
+
             docker compose up -d --remove-orphans
 
-            echo "===> [DEPLOY] Aguardando inicialização..."
+
+            # ================================================================
+            # AGUARDAR INICIALIZAÇÃO
+            # ================================================================
+
+            echo ""
+            echo "===> [DEPLOY] Aguardando inicialização da aplicação..."
+
             sleep 5
 
-            echo "===> [DEPLOY] Status dos containers..."
+
+            # ================================================================
+            # STATUS DOS CONTAINERS
+            # ================================================================
+
+            echo ""
+            echo "===> [DEPLOY] Status dos containers:"
+
             docker compose ps
 
-            echo "===> [DEPLOY] Testando Health Check..."
+
+            # ================================================================
+            # HEALTH CHECK
+            # ================================================================
+
+            echo ""
+            echo "===> [DEPLOY] Executando Health Check..."
+
             HEALTH_OUTPUT=$(curl -s -f http://127.0.0.1:8080/health)
 
+
+            if [ -z "$HEALTH_OUTPUT" ]; then
+
+              echo ""
+              echo "ERRO: Health Check não retornou resposta."
+
+              exit 1
+
+            fi
+
+
+            echo ""
             echo "Resposta do Health Check:"
             echo "$HEALTH_OUTPUT"
 
-            echo "=============================================="
-            echo "       DEPLOY FINALIZADO COM SUCESSO"
-            echo "=============================================="
+
+            # ================================================================
+            # FINALIZAÇÃO
+            # ================================================================
+
+            echo ""
+            echo "============================================================"
+            echo "          DEPLOY FINALIZADO COM SUCESSO"
+            echo "============================================================"
+            echo ""

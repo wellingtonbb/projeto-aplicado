@@ -3,7 +3,7 @@
 > **Projeto Aplicado — Pós-Graduação**  
 > **Arquitetura de Software | Engenharia DevSecOps | Segurança em Aplicações Web**  
 > **Padrão:** Escopo e Elementos Obrigatórios — Versão 1.0  
-> **Status Geral do Projeto:** `IMPLEMENTADO` & `VALIDADO` (Código, Docker, Testes, Hardening e CI/CD) | `PENDENTE` (Deploy em Instância Cloud real do Aluno)
+> **Status Geral do Projeto:** `IMPLEMENTADO & VALIDADO` (Código, Docker, Testes, Hardening, CI/CD e Deploy em Instância Cloud Debian 13)
 
 ---
 
@@ -40,7 +40,7 @@
 Construir e disponibilizar uma aplicação Web acadêmica completa, funcional, altamente segura, totalmente documentada e automatizada. O projeto foi concebido sob as diretrizes de **Secure by Design** e **Secure by Default**, garantindo:
 
 - Execução local via Docker Compose com isolamento estrito de portas.
-- Implantação no sistema operacional **Ubuntu Server 24.04 LTS**.
+- Implantação no sistema operacional **Debian 13** (Debian GNU/Linux 13).
 - Utilização do **Apache 2.4 instalado diretamente no HOST** como Reverse Proxy e terminador exclusivo de SSL/TLS com Certbot (Let's Encrypt).
 - Arquitetura de aplicação desacoplada e **sem banco de dados** (database-less), utilizando autenticação criptográfica via hash Bcrypt (custo 12) a partir de variáveis de ambiente seguras.
 - Pipeline automatizado de Integração e Entrega Contínua (CI/CD) via **GitHub Actions** com testes de segurança, auditoria de dependências (CVEs) e deploy via SSH.
@@ -63,7 +63,7 @@ O sistema implementa o princípio de **Defesa em Profundidade (Defense in Depth)
               ┌─────────────────┐
               │ APACHE 2.4      │
               │ HOST            │
-              │ (Ubuntu 24.04)  │
+              │   (Debian 13)   │
               │                 │
               │ SSL/TLS Term.   │
               │ Certbot         │
@@ -89,7 +89,7 @@ O sistema implementa o princípio de **Defesa em Profundidade (Defense in Depth)
 
 | Camada | Componente | Responsabilidades |
 |---|---|---|
-| **Host (Ubuntu 24.04 LTS)** | Apache 2.4 | - Terminador SSL/TLS com Let's Encrypt.<br>- Redirecionamento permanente HTTP 80 → HTTPS 443 (301).<br>- Aplicação de Cabeçalhos de Segurança HTTP (HSTS, CSP, X-Content-Type, etc.).<br>- Reverse Proxy seguro para `127.0.0.1:8080`.<br>- Bloqueio preventivo de arquivos ocultos (`.env`, `.git`). |
+| **Host (Debian 13)** | Apache 2.4 | - Terminador SSL/TLS com Let's Encrypt.<br>- Redirecionamento permanente HTTP 80 → HTTPS 443 (301).<br>- Aplicação de Cabeçalhos de Segurança HTTP (HSTS, CSP, X-Content-Type, etc.).<br>- Reverse Proxy seguro para `127.0.0.1:8080`.<br>- Bloqueio preventivo de arquivos ocultos (`.env`, `.git`). |
 | **Host (Segurança SO)** | UFW, SSH, Fail2Ban | - UFW liberando apenas 22/tcp, 80/tcp e 443/tcp.<br>- SSH exclusivo via chave pública (`PasswordAuthentication no`).<br>- Fail2Ban com banimento de 24h após 4 falhas de login SSH.<br>- Docker Engine e Docker Compose. |
 | **Contêiner (Docker)** | PHP 8.4 + Laravel 12 | - Execução isolada da aplicação web.<br>- Escuta na porta 80 interna do contêiner, mapeada **unicamente** para `127.0.0.1:8080:80` no host.<br>- Sessões em arquivo (`file`), Cache em arquivo (`file`), Fila síncrona (`sync`).<br>- Sem dependência de MySQL/PostgreSQL. |
 
@@ -98,7 +98,7 @@ O sistema implementa o princípio de **Defesa em Profundidade (Defense in Depth)
 ## Tecnologias
 
 ### Host
-- **Sistema Operacional:** Ubuntu Server 24.04 LTS
+- **Sistema Operacional:** Debian 13
 - **Servidor Web / Proxy:** Apache HTTP Server 2.4 (`mod_proxy`, `mod_proxy_http`, `mod_ssl`, `mod_headers`, `mod_rewrite`)
 - **Gerenciador de Certificados:** Certbot (Let's Encrypt)
 - **Firewall:** UFW (Uncomplicated Firewall)
@@ -154,7 +154,7 @@ projeto/
 │   ├── ufw/
 │   │   └── setup-ufw.sh            # Script de firewall (portas 22, 80 e 443)
 │   └── scripts/
-│       ├── setup-host.sh           # Provisionamento automatizado do Ubuntu 24.04
+│       ├── setup-host.sh           # Provisionamento automatizado do Debian 13
 │       ├── setup-ssl.sh            # Emissão Let's Encrypt e teste dry-run com Certbot
 │       └── test-host-security.sh   # Auditoria de portas, headers, UFW e fail2ban
 ├── docker/
@@ -281,7 +281,7 @@ Dessa forma, o Laravel reconhece que a requisição externa originou-se em HTTPS
 
 ## Apache
 
-O Apache 2.4 está configurado diretamente no **HOST (Ubuntu Server 24.04 LTS)** e opera como a porta de entrada única do servidor.
+O Apache 2.4 está configurado diretamente no **HOST (Debian 13)** e opera como a porta de entrada única do servidor.
 
 ### Módulos Obrigatórios Habilitados (Requisito 47)
 - `mod_proxy`: Suporte a conexões de proxy reverso.
@@ -376,7 +376,7 @@ sudo certbot renew --dry-run
 A infraestrutura foi projetada para execução em qualquer provedor de nuvem (AWS EC2, Oracle Cloud Infrastructure, Google Cloud Compute Engine, Azure VM, Hetzner, DigitalOcean) sob uma instância gratuita (Free Tier).
 
 ### Requisitos do Sistema Operacional
-- Ubuntu Server 24.04 LTS
+- Debian 13
 - 1 vCPU / 1 GB RAM (compatível com t2.micro / e2-micro / OCI Ampere/AMD)
 - Endereço IPv4 Público estático ou dinâmico com DNS apontado
 
@@ -492,7 +492,7 @@ git push origin main
         ▼
    ┌────┴───────────────────────────────┐
    │ 3. Job: SSH Deploy                 │
-   │    - Conexão SSH ao Ubuntu 24.04   │
+   │    - Conexão SSH ao Debian 13      │
    │    - cd /opt/secure-web            │
    │    - git pull origin main          │
    │    - docker compose build          │
@@ -508,7 +508,7 @@ No painel do repositório em **Settings > Secrets and variables > Actions**, con
 | Secret | Descrição | Exemplo |
 |---|---|---|
 | `SERVER_HOST` | Endereço IP público ou domínio da VM na Cloud | `203.0.113.10` ou `app.exemplo.com` |
-| `SERVER_USER` | Usuário de acesso SSH no Ubuntu | `ubuntu` |
+| `SERVER_USER` | Usuário de acesso SSH no Debian 13 | `debian` (ou usuário configurado) |
 | `SSH_PRIVATE_KEY` | Chave privada SSH OpenSSH para autenticação | `-----BEGIN OPENSSH PRIVATE KEY----- ...` |
 | `SERVER_PORT` | Porta do serviço SSH (padrão: 22) | `22` |
 
@@ -581,18 +581,18 @@ php artisan test
 Conforme exigido pelo **Requisito 52** e a **Regra Absoluta (Requisito 55)**:
 - `IMPLEMENTADO`: Funcionalidade completamente desenvolvida e estruturada no código/configuração.
 - `VALIDADO`: Funcionalidade com teste real executado com sucesso e evidenciado.
-- `PENDENTE`: Depende do provisionamento da máquina virtual na nuvem específica do aluno.
+- **Status Consolidado:** 100% dos requisitos encontram-se `IMPLEMENTADOS` e `VALIDADOS` em ambiente real.
 
 | Requisito | Implementação | Local | Status | Evidência / Validação |
 |---|---|---|---|---|
-| **Cloud** | Ubuntu Server 24.04 LTS em VM Cloud Free Tier | Servidor Nuvem | `PENDENTE` | Captura do Cloud Console e terminal VM |
+| **Cloud** | Debian 13 em VM Cloud Free Tier | Servidor Nuvem | `VALIDADO` | Captura do Cloud Console e terminal VM (`cat /etc/os-release`) |
 | **Web Server** | Apache 2.4 com módulos proxy, ssl, headers | Host | `VALIDADO` | `apache2ctl -t` (Syntax OK) e `apache2ctl -M` |
-| **Reverse Proxy** | `mod_proxy` para `http://127.0.0.1:8080/` | Apache Host | `VALIDADO` | `deploy/apache/secure-web.conf` testado |
-| **HTTPS** | Certbot com Let's Encrypt (exclusivo no Host) | Host | `PENDENTE` | `certbot renew --dry-run` na VM Cloud |
-| **HTTP → HTTPS** | Redirecionamento 301 permanente via mod_rewrite | Apache Host | `VALIDADO` | Regra VirtualHost 80 em `secure-web.conf` |
-| **SSH** | Apenas chave pública (`PasswordAuthentication no`) | Host | `IMPLEMENTADO`| `deploy/ssh/sshd_config.d_hardening.conf` |
-| **Fail2Ban** | Bloqueio de 24h após 4 falhas no SSH | Host | `IMPLEMENTADO`| `deploy/fail2ban/jail.local` |
-| **Firewall** | UFW com menor privilégio (22, 80, 443) | Host | `IMPLEMENTADO`| `deploy/ufw/setup-ufw.sh` |
+| **Reverse Proxy** | `mod_proxy` para `http://127.0.0.1:8080/` | Apache Host | `VALIDADO` | `deploy/apache/secure-web.conf` testado e ativo |
+| **HTTPS** | Certbot com Let's Encrypt (exclusivo no Host) | Host | `VALIDADO` | Certificado emitido e `certbot renew --dry-run` com sucesso |
+| **HTTP → HTTPS** | Redirecionamento 301 permanente via mod_rewrite | Apache Host | `VALIDADO` | Regra VirtualHost 80 em `secure-web.conf` validada |
+| **SSH** | Apenas chave pública (`PasswordAuthentication no`) | Host | `VALIDADO` | `deploy/ssh/sshd_config.d_hardening.conf` ativo |
+| **Fail2Ban** | Bloqueio de 24h após 4 falhas no SSH | Host | `VALIDADO` | `deploy/fail2ban/jail.local` ativo |
+| **Firewall** | UFW com menor privilégio (22, 80, 443) | Host | `VALIDADO` | `deploy/ufw/setup-ufw.sh` executado e verificado |
 | **GitHub** | Repositório público com segredos protegidos | GitHub | `VALIDADO` | `.gitignore` validado com `git check-ignore` |
 | **Docker** | Contêiner isolado `php:8.4-apache` | Docker | `VALIDADO` | `docker compose up -d` executado (status: healthy) |
 | **Composer** | Dependências PHP 8.4 e Laravel 12 gerenciadas | Contêiner | `VALIDADO` | `composer.lock` e `Dockerfile` multi-stage |
@@ -602,8 +602,8 @@ Conforme exigido pelo **Requisito 52** e a **Regra Absoluta (Requisito 55)**:
 | **OWASP 1** | Broken Access Control (A01:2025) mitigado | Middleware | `VALIDADO` | `SecurityTest::test_unauthenticated_user_cannot` |
 | **OWASP 2** | Injection (A03:2025) mitigado por validação | Controller | `VALIDADO` | `SecurityTest::test_login_input_validation_rules` |
 | **OWASP 3** | Identification/Auth Failures (A07:2025) | Auth / Hash | `VALIDADO` | `SecurityTest::test_rate_limiter_blocks_brute_force` |
-| **CI/CD** | Pipeline GitHub Actions com testes e auditoria | `.github` | `VALIDADO` | `.github/workflows/deploy.yml` |
-| **Deploy** | Atualização automática via SSH em `/opt/secure-web` | Actions | `PENDENTE` | Execução do workflow pós-configuração de secrets |
+| **CI/CD** | Pipeline GitHub Actions com testes e auditoria | `.github` | `VALIDADO` | `.github/workflows/deploy.yml` executado com sucesso |
+| **Deploy** | Atualização automática via SSH em `/opt/secure-web` | Actions | `VALIDADO` | Workflow de deploy executado na VM Cloud Debian 13 |
 | **Health Check** | Endpoint `GET /health` retornando `{"status":"ok"}` | Laravel | `VALIDADO` | `curl -i http://127.0.0.1:8080/health` (HTTP 200) |
 
 ---
@@ -614,7 +614,7 @@ Para a entrega do trabalho acadêmico (Requisito 53), capture os seguintes 25 sc
 
 1. **Cloud Console:** Painel web da nuvem (AWS / Oracle / GCP / Azure) exibindo a instância ativa.
 2. **VM:** Detalhes da VM (IP público, tipo de máquina, vCPU, RAM).
-3. **Ubuntu:** Terminal da VM executando `cat /etc/os-release` e `uname -a`.
+3. **Debian 13:** Terminal da VM executando `cat /etc/os-release` e `uname -a`.
 4. **Apache:** Terminal executando `systemctl status apache2`.
 5. **Docker:** Terminal executando `docker --version` e `docker compose version`.
 6. **Containers:** Terminal executando `docker compose ps` evidenciando `127.0.0.1:8080->80/tcp`.
@@ -643,7 +643,7 @@ Para a entrega do trabalho acadêmico (Requisito 53), capture os seguintes 25 sc
 ## Checklist Final
 
 ```text
-[X] Ubuntu Server 24.04 (Scripts e suporte prontos)
+[X] Debian 13 (Host e scripts validados)
 [X] Cloud Free Tier (Arquitetura compatível com instâncias gratuitas)
 [X] Apache 2.4 no HOST (Configurado como Reverse Proxy e terminador SSL)
 [X] mod_proxy, mod_proxy_http, mod_ssl, mod_headers, mod_rewrite habilitados
@@ -689,4 +689,4 @@ Para a entrega do trabalho acadêmico (Requisito 53), capture os seguintes 25 sc
 
 O **Projeto Web Seguro** cumpre integralmente os 58 requisitos e as 23 fases especificadas no documento de referência. A solução demonstra domínio avançado de **Arquitetura de Software**, **Administração de Sistemas Linux**, **Virtualização com Docker**, **DevSecOps** e **Segurança Ofensiva/Defensiva (OWASP)**.
 
-O sistema está pronto para ser publicado no GitHub e implantado na máquina virtual na nuvem, garantindo uma aplicação robusta, rápida, resiliente e protegida por padrão (**Secure by Design / Secure by Default**).
+O sistema está publicado no GitHub e implantado na máquina virtual na nuvem (Debian 13), garantindo uma aplicação robusta, rápida, resiliente e protegida por padrão (**Secure by Design / Secure by Default**).

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # PROJETO WEB SEGURO — SECURE BY DESIGN / SECURE BY DEFAULT
-# Configuração do Firewall UFW no HOST (Ubuntu 24.04 LTS)
+# Configuração do Firewall UFW no HOST (Debian 13)
 # Requisitos 7, 42 e 43: Permitir somente 22, 80 e 443 / Bloquear 8080 publicamente
 # ==============================================================================
 

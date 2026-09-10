@@ -1,6 +1,6 @@
 # ==============================================================================
 # PROJETO WEB SEGURO — SECURE BY DESIGN / SECURE BY DEFAULT
-# Configuração Fail2Ban no HOST (Ubuntu 24.04 LTS)
+# Configuração Fail2Ban no HOST (Debian 13)
 # Arquivo: /etc/fail2ban/jail.local
 # Requisito 41: SSH com maxretry = 4 e bantime = 24h
 # ==============================================================================
@@ -15,7 +15,7 @@ findtime = 10m
 # Número máximo de falhas antes do banimento: 4 tentativas
 maxretry = 4
 
-# Backend de detecção no Ubuntu 24.04 (systemd journal)
+# Backend de detecção no Debian 13 (systemd journal)
 backend = systemd
 
 # Ação de banimento utilizando iptables/nftables padrão

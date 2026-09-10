@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # PROJETO WEB SEGURO — SECURE BY DESIGN / SECURE BY DEFAULT
-# Script de Validação e Auditoria de Segurança do HOST (Ubuntu 24.04 LTS)
+# Script de Validação e Auditoria de Segurança do HOST (Debian 13)
 # Requisitos 41, 42, 43, 47, 48 e 49: Validações de Apache, Portas, UFW, Fail2Ban e TLS
 # ==============================================================================
 
 set -u
 
 echo "======================================================================"
-echo "         AUDITORIA DE SEGURANÇA E CONFORMIDADE DO HOST LINUX          "
+echo "    AUDITORIA DE SEGURANÇA E CONFORMIDADE DO HOST LINUX (DEBIAN 13)   "
 echo "======================================================================"
 
 # 1. Teste de Sintaxe do Apache (Requisito 47)

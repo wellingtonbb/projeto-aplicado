@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # PROJETO WEB SEGURO — SECURE BY DESIGN / SECURE BY DEFAULT
-# Script de Provisionamento Completo do HOST (Ubuntu Server 24.04 LTS)
+# Script de Provisionamento Completo do HOST (Debian 13)
 # Instala e configura: Apache 2.4, Docker, Certbot, Fail2Ban, UFW e SSH Hardening
 # ==============================================================================
 
 set -euo pipefail
 
 echo "======================================================================"
-echo "    PROJETO WEB SEGURO — PROVISIONAMENTO DO UBUNTU HOST 24.04 LTS     "
+echo "      PROJETO WEB SEGURO — PROVISIONAMENTO DO DEBIAN 13 HOST          "
 echo "======================================================================"
 
 # 1. Atualização do Sistema Operacional
@@ -41,12 +41,12 @@ sudo a2enmod rewrite
 echo "===> [4/8] Instalando Docker Engine e Docker Compose oficial..."
 sudo install -m 0755 -d /etc/apt/keyrings
 if [ ! -f /etc/apt/keyrings/docker.asc ]; then
-    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
     sudo chmod a+r /etc/apt/keyrings/docker.asc
 fi
 
 echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 

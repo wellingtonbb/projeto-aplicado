@@ -255,7 +255,7 @@ Em conformidade rigorosa com o **Requisito 9**, o projeto não utiliza banco de 
 
 | Método | Rota | Descrição | Proteção / Middleware |
 |---|---|---|---|
-| `GET` | `/` | Redirecionamento padrão para o Dashboard | Público |
+| `GET` | `/` | Redirecionamento contextual (Dashboard se autenticado, Login limpo se visitante) | Público |
 | `GET` | `/login` | Exibe o formulário de login profissional | `custom.guest` (redireciona para dashboard se já logado) |
 | `POST` | `/login` | Processa validação, Rate Limit, Bcrypt e Session Fixation | `custom.guest`, Validação Estrita, RateLimiter |
 | `GET` | `/dashboard` | Painel de controle com status, controles e tabela OWASP | `custom.auth` (redireciona para login se não autenticado) |

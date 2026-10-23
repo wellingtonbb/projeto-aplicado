@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HealthController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -11,9 +12,13 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Redirecionamento da raiz
-Route::get('/', function () {
-    return redirect()->route('dashboard');
+// Redirecionamento da raiz (contextual: dashboard se autenticado, login se convidado)
+Route::get('/', function (Request $request) {
+    if ($request->session()->has('authenticated_user')) {
+        return redirect()->route('dashboard');
+    }
+
+    return redirect()->route('login');
 });
 
 // Endpoint de Health Check seguro (Requisito 32)

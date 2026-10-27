@@ -22,7 +22,7 @@ Aplicação web acadêmica desenvolvida com foco em **Secure by Design** e **Sec
 | Sistema operacional | Debian 13 |
 | Servidor web | Apache 2.4 instalado no host |
 | Aplicação | Laravel 12 com PHP 8.4 em contêiner Docker |
-| Acesso externo | [https://projeto.barreto.uk](https://projeto.barreto.uk) — redireciona para `/login` |
+| Acesso externo | [https://projeto.barreto.uk](https://projeto.barreto.uk) |
 | Código-fonte | [GitHub — projeto-aplicado](https://github.com/wellingtonbb/projeto-aplicado) |
 | Porta interna da aplicação | `127.0.0.1:8080` — loopback do host |
 | Banco de dados | Não utiliza SGBD; sessões e cache em arquivos |
